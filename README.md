@@ -6,7 +6,7 @@ Simple Mojolicious::Lite application to serve a [OrePAN2](https://metacpan.org/p
 
 ```
 # Start the server and point to repo
-export OREPAN2_PATH=/var/local/orepan
+export OREPAN_ROOT=/var/local/orepan
 ./mojo-orepan2
 
 # mojo-orepan2 will return redirects to a fallback CPAN mirror if the module isn't present. This defaults to MetaCPAN by default but can be overwritten.
@@ -26,4 +26,11 @@ user ccakes
 password doesnt-matter
 ```
 
+mojo-orepan2 doesn't support any auth mechanism however `cpan-upload` requires the fields be present. `user` is used as the AUTHOR.
 
+## Using with Docker
+
+```
+docker build -t orepan .
+docker run -d -p 3000:3000 -v /path/to/orepan-root:/darkpan orepan
+```

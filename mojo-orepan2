@@ -7,8 +7,8 @@ use OrePAN2::Injector;
 use File::Temp qw(tempdir);
 use File::Spec;
 
-die 'OREPAN2_PATH must be specified' unless $ENV{OREPAN2_PATH};
-push @{app->static->paths}, $ENV{OREPAN2_PATH};
+die 'OREPAN_ROOT must be specified' unless $ENV{OREPAN_ROOT};
+push @{app->static->paths}, $ENV{OREPAN_ROOT};
 
 my $CPAN_MIRROR = $ENV{CPAN_MIRROR} // 'https://cpan.metacpan.org';
 

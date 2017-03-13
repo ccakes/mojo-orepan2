@@ -39,7 +39,7 @@ user ccakes
 password doesnt-matter
 ```
 
-mojo-orepan2 doesn't support any auth mechanism however `cpan-upload` requires the fields be present. `user` is used as the AUTHOR.
+mojo-orepan2 doesn't support any auth mechanism however `CPAN::Uploader` requires the fields be present. `user` is used as the AUTHOR.
 
 ## Using with Docker
 

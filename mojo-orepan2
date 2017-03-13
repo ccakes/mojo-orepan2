@@ -2,6 +2,7 @@
 
 use Mojolicious::Lite;
 
+use File::Spec;
 use File::Basename;
 use OrePAN2::Indexer;
 use OrePAN2::Injector;
@@ -15,13 +16,29 @@ helper mirror => sub {
 };
 
 helper injector => sub {
-  state $injector = OrePAN2::Injector->new(
-    directory => $ENV{OREPAN_ROOT}
-  );
+  state $injector = OrePAN2::Injector->new(directory => $ENV{OREPAN_ROOT});
 };
 
-helper run_indexer => sub {
-  OrePAN2::Indexer->new(directory => $ENV{OREPAN_ROOT})->make_index(no_compress => !1);
+helper index => sub {
+  state $index = OrePAN2::Index->new;
+
+  # Silly hack to not do this every invocation
+  if (!scalar(keys %{$index->{index}})) {
+    $index->load(
+      File::Spec->catfile($ENV{OREPAN_ROOT}, 'modules', '02packages.details.txt.gz')
+    );
+  }
+
+  return $index;
+};
+
+helper add_to_index => sub {
+  my ($c, $file) = @_;
+
+  state $indexer = OrePAN2::Indexer->new(directory => $ENV{OREPAN_ROOT});
+  $indexer->add_index($c->app->index, $file);
+
+  $indexer->write_index($c->app->index);
 };
 
 post '/upload' => sub {
@@ -37,11 +54,20 @@ post '/upload' => sub {
   my $author = $c->param('HIDDENNAME') // 'DUMMY';
 
   $c->app->injector->inject($file->filename, { author => $author });
-  $c->app->run_indexer;
+  $c->app->add_to_index($file->filename);
 
   unlink $file->filename if -f $file->filename;
 
   $c->render(text => 'OK');
+};
+
+get '/reindex' => sub {
+  my ($c) = @_;
+
+  my $index = OrePAN2::Indexer->new(directory => $ENV{OREPAN_ROOT})->make_index;
+  my @packages = $index->packages;
+
+  $c->render(text => 'Index updated with ' . scalar @packages . ' packages');
 };
 
 get '/*path' => {path => ''} => sub {
@@ -71,7 +97,7 @@ get '/*path' => {path => ''} => sub {
 
       $tx->result->content->asset->move_to($filename);
       $c->app->injector->inject($filename, { author => $author });
-      $c->app->run_indexer;
+      $c->app->add_to_index($filename);
 
       unlink $filename if -f $filename;
 

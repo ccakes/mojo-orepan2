@@ -2,6 +2,8 @@
 
 Simple Mojolicious::Lite application to serve a [OrePAN2](https://metacpan.org/pod/OrePAN2) repository with support for a PAUSE-like upload interface.
 
+mojo-orepan2 can be used as the singular mirror for cpanm as it will either serve modules that it knows about **or** fetch them from the CPAN, add them to the OrePAN repository and serve the module once it's been saved. This behaviour can be optionally disabled with an environment flag.
+
 ## Usage
 
 ```
@@ -9,10 +11,21 @@ Simple Mojolicious::Lite application to serve a [OrePAN2](https://metacpan.org/p
 export OREPAN_ROOT=/var/local/orepan
 ./mojo-orepan2
 
-# mojo-orepan2 will return redirects to a fallback CPAN mirror if the module isn't present. This defaults to MetaCPAN by default but can be overwritten.
-
-export CPAN_MIRROR=http://cpan.cpantesters.org
+# mojo-orepan2 will fetch and cache modules from a CPAN mirror if the module
+# isn't present. This defaults to MetaCPAN by default but can be overwritten.
+export OREPAN_PASSTHRU=http://cpan.cpantesters.org
 ./mojo-orepan2
+
+# If you don't want the pass-through behaviour
+export OREPAN_NO_PASSTHRU=1
+./mojo-orepan2
+
+# Using cpanm
+cpanm --mirror http://localhost:3000 My::Module
+PERL_CPANM_OPT="--mirror http://localhost:3000" cpanm My::Module
+
+# Using carton
+PERL_CARTON_MIRROR="http://localhost:3000" carton install
 ```
 
 This project is largely for me to use in the [Minilla](https://metacpan.org/pod/Minilla#release.pause_config) workflow as OrePAN2::Server doesn't seem to be maintained much anymore and tests for the version in CPAN are failing.

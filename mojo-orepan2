@@ -2,15 +2,27 @@
 
 use Mojolicious::Lite;
 
+use File::Basename;
 use OrePAN2::Indexer;
 use OrePAN2::Injector;
-use File::Temp qw(tempdir);
-use File::Spec;
 
 die 'OREPAN_ROOT must be specified' unless $ENV{OREPAN_ROOT};
 push @{app->static->paths}, $ENV{OREPAN_ROOT};
 
-my $CPAN_MIRROR = $ENV{CPAN_MIRROR} // 'https://cpan.metacpan.org';
+helper mirror => sub {
+  my ($c, $path) = @_;
+  $ENV{OREPAN_PASSTHRU} // 'https://cpan.metacpan.org' . $path;
+};
+
+helper injector => sub {
+  state $injector = OrePAN2::Injector->new(
+    directory => $ENV{OREPAN_ROOT}
+  );
+};
+
+helper run_indexer => sub {
+  OrePAN2::Indexer->new(directory => $ENV{OREPAN_ROOT})->make_index(no_compress => !1);
+};
 
 post '/upload' => sub {
   my ($c) = @_;
@@ -22,23 +34,12 @@ post '/upload' => sub {
     unless $c->param('pause99_add_uri_upload');
 
   my $file = $c->param('pause99_add_uri_httpupload');
-  my $author = $c->param('HIDDENNAME');
+  my $author = $c->param('HIDDENNAME') // 'DUMMY';
 
-  my $tmp = tempdir(CLEANUP => 1);
-  my $module_path = File::Spec->catpath($tmp, $file->filename);
-  $file->move_to($module_path);
+  $c->app->injector->inject($file->filename, { author => $author });
+  $c->app->run_indexer;
 
   unlink $file->filename if -f $file->filename;
-
-  my $injector = OrePAN2::Injector->new(
-    directory => $ENV{OREPAN2_PATH},
-    author => uc $author,
-  );
-  $injector->inject($module_path);
-
-  OrePAN2::Indexer->new(directory => $ENV{OREPAN2_PATH})->make_index(
-    no_compress => !1,
-  );
 
   $c->render(text => 'OK');
 };
@@ -46,11 +47,41 @@ post '/upload' => sub {
 get '/*path' => {path => ''} => sub {
   my ($c) = @_;
 
-  if ($c->req->url->path->to_string =~ /^\/authors/) {
-    return $c->redirect_to($CPAN_MIRROR . $c->req->url->path->to_string);
+  # Optionally disable pass-through
+  if ($ENV{OREPAN_NO_PASSTHRU}) {
+    $c->render(text => 'Not Found', status => 404);
   }
 
-  $c->render(text => 'Not Found', status => 404);
+  if ($c->req->url->path->to_string =~ /^\/authors/) {
+    $c->render_later;
+
+    my $filename = basename $c->req->url->path->to_string;
+    my ($author) = $c->req->url->path->to_string =~ m{authors/id/./../([^/]+)};
+
+    # Grab a copy of the package and index for leet caching (or internet-less development)
+    $c->ua->get($c->app->mirror($c->req->url->path->to_string) => sub {
+      my ($ua, $tx) = @_;
+
+      if (!$tx->success) {
+        $c->render(
+          text => $tx->error->{message},
+          status => $tx->error->{code} || 404
+        ) and return;
+      }
+
+      $tx->result->content->asset->move_to($filename);
+      $c->app->injector->inject($filename, { author => $author });
+      $c->app->run_indexer;
+
+      unlink $filename if -f $filename;
+
+      $c->res->headers->content_disposition("attachment; filename=$filename;");
+      $c->reply->static($c->req->url->path->to_string);
+    });
+  }
+  else {
+    $c->render(text => 'Not Found', status => 404);
+  }
 };
 
 app->start;

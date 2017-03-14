@@ -53,6 +53,8 @@ post '/upload' => sub {
   my $file = $c->param('pause99_add_uri_httpupload');
   my $author = $c->param('HIDDENNAME') // 'DUMMY';
 
+  $file->move_to($file->filename);
+
   $c->app->injector->inject($file->filename, { author => $author });
   $c->app->add_to_index($file->filename);
 

@@ -82,7 +82,7 @@ get '/*path' => {path => ''} => sub {
     $c->render_later;
 
     my $filename = basename $c->req->url->path->to_string;
-    my ($author) = $c->req->url->path->to_string =~ m{authors/id/./../([^/]+)};
+    my ($author, $subdirectory) = $c->req->url->path->to_string =~ m{authors/id/./../([^/]+)/([^/]+)};
 
     # Grab a copy of the package and index for leet caching (or internet-less development)
     $c->ua->get($c->app->mirror($c->req->url->path->to_string) => sub {
@@ -96,7 +96,10 @@ get '/*path' => {path => ''} => sub {
       }
 
       $tx->result->content->asset->move_to($filename);
-      $c->app->injector->inject($filename, { author => $author });
+      $c->app->injector->inject($filename, {
+        author => $author,
+        author_subdir => ( $subdirectory eq $filename ) ? '' : $subdirectory
+      });
       $c->app->add_to_index($filename);
 
       unlink $filename if -f $filename;

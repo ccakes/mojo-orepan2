@@ -1,4 +1,4 @@
-FROM ccakes/perl-alpine:latest
+FROM ccakes/perl-runtime:latest
 MAINTAINER cam.daniel@gmail.com
 
 ENV OREPAN_ROOT /darkpan
